@@ -3,7 +3,15 @@ import { useAccount, useWriteContract } from 'wagmi'
 import { beamDAOContract } from '../contracts/beamDaoContract'
 import Header from '../components/header'
 
-function ProjectPreviewCard({ name, logoURI, backdropURI, bio, creator }) {
+interface ProjectPreviewCardProps {
+  name: string;
+  logoURI: string;
+  backdropURI: string;
+  bio: string;
+  creator: string | undefined;
+}
+
+function ProjectPreviewCard({ name, logoURI, backdropURI, bio, creator }: ProjectPreviewCardProps) {
   return (
     <div className="bg-white rounded-lg border border-gray-200 shadow-md overflow-hidden">
       <div className="h-24 bg-cover bg-center" style={{ backgroundImage: `url(${backdropURI || 'https://via.placeholder.com/400x150'})` }}></div>

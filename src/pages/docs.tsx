@@ -87,8 +87,10 @@ const sections = {
   },
 }
 
+type SectionKey = keyof typeof sections;
+
 export default function DocsPage() {
-  const [activeSection, setActiveSection] = useState('introduction')
+  const [activeSection, setActiveSection] = useState<SectionKey>('introduction')
 
   return (
     <div className="min-h-screen bg-white">
@@ -98,12 +100,12 @@ export default function DocsPage() {
           <div className="col-span-3">
             <div className="sticky top-24">
               <ul className="space-y-2">
-                {Object.entries(sections).map(([key, { title }]) => (
+                {Object.keys(sections).map((key) => (
                   <li key={key}>
                     <button
-                      onClick={() => setActiveSection(key)}
+                      onClick={() => setActiveSection(key as SectionKey)}
                       className={`w-full text-left px-4 py-2 rounded-lg transition-colors duration-200 ${activeSection === key ? 'bg-purple-100 text-purple-700' : 'hover:bg-gray-100'}`}>
-                      {title}
+                      {sections[key as SectionKey].title}
                     </button>
                   </li>
                 ))}
