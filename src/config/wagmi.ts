@@ -1,5 +1,5 @@
 import { http, createConfig } from 'wagmi'
-import { metaMask } from 'wagmi/connectors'
+import { metaMask, coinbaseWallet, injected } from 'wagmi/connectors'
 
 export const pushDonut = {
   id: 42101,
@@ -19,9 +19,9 @@ export const pushDonut = {
     },
   },
   blockExplorers: {
-    default: { 
-      name: 'Push Explorer', 
-      url: 'https://donut.push.network' 
+    default: {
+      name: 'Push Explorer',
+      url: 'https://donut.push.network'
     },
   },
   testnet: true,
@@ -29,7 +29,13 @@ export const pushDonut = {
 
 export const config = createConfig({
   chains: [pushDonut],
-  connectors: [metaMask()],
+  connectors: [
+    injected(),
+    metaMask(),
+    coinbaseWallet({
+      appName: 'BeamDAO',
+    }),
+  ],
   transports: {
     [pushDonut.id]: http(),
   },

@@ -1,15 +1,10 @@
 import { useState } from 'react'
-import { useAccount, useConnect, useDisconnect } from 'wagmi'
 import { Link } from 'react-router-dom'
+import { PushUniversalAccountButton } from '@pushchain/ui-kit'
 import beamlogo from '../assets/beamlogo.png'
 
 export default function Header() {
-  const { address, isConnected } = useAccount()
-  const { connect, connectors } = useConnect()
-  const { disconnect } = useDisconnect()
   const [isMenuOpen, setIsMenuOpen] = useState(false)
-
-  const truncatedAddress = address ? `${address.slice(0, 6)}...${address.slice(-4)}` : ''
 
   return (
     <header className="bg-white shadow-sm">
@@ -24,14 +19,14 @@ export default function Header() {
           {/* Navigation Links - Center */}
           <div className="hidden md:flex flex-1 justify-center">
             <nav className="flex items-center space-x-8">
-              <Link 
-                to="/" 
+              <Link
+                to="/"
                 className="text-gray-500 hover:text-gray-700 font-medium transition-colors duration-200"
               >
                 Explore
               </Link>
-              <Link 
-                to="/docs" 
+              <Link
+                to="/docs"
                 className="text-gray-500 hover:text-gray-700 font-medium transition-colors duration-200"
               >
                 Docs
@@ -39,30 +34,9 @@ export default function Header() {
             </nav>
           </div>
 
-          {/* Connect Button - Extreme Right */}
+          {/* Push Universal Wallet Button - Extreme Right */}
           <div className="hidden md:flex flex-shrink-0">
-            {isConnected ? (
-              <div className="flex items-center space-x-3">
-                <div className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm font-medium">
-                  {truncatedAddress}
-                </div>
-                <button
-                  onClick={() => disconnect()}
-                  className="text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors hover:opacity-90"
-                  style={{ backgroundColor: '#d947f2' }}
-                >
-                  Disconnect
-                </button>
-              </div>
-            ) : (
-              <button
-                onClick={() => connect({ connector: connectors[0] })}
-                className="text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors hover:opacity-90"
-                style={{ backgroundColor: '#d947f2' }}
-              >
-                Connect Wallet
-              </button>
-            )}
+            <PushUniversalAccountButton />
           </div>
 
           {/* Mobile Menu Button */}
@@ -88,28 +62,7 @@ export default function Header() {
             <Link to="/docs" className="text-gray-500 hover:text-gray-700 block px-3 py-2 rounded-md text-base font-medium">Docs</Link>
           </div>
           <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3">
-          {isConnected ? (
-              <div className="flex items-center space-x-3">
-                <div className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm font-medium">
-                  {truncatedAddress}
-                </div>
-                <button
-                  onClick={() => disconnect()}
-                  className="text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors hover:opacity-90"
-                  style={{ backgroundColor: '#d947f2' }}
-                >
-                  Disconnect
-                </button>
-              </div>
-            ) : (
-              <button
-                onClick={() => connect({ connector: connectors[0] })}
-                className="text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors hover:opacity-90"
-                style={{ backgroundColor: '#d947f2' }}
-              >
-                Connect Wallet
-              </button>
-            )}
+            <PushUniversalAccountButton />
           </div>
         </div>
       )}

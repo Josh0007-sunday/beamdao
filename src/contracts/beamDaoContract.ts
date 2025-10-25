@@ -2,7 +2,7 @@ import type { Abi } from 'viem'
 import BeamDAOArtifact from './BeamDAO.json'
 
 // Replace with your deployed contract address
-export const BEAM_DAO_ADDRESS = '0x7076bBC4ade3533577dBD5631Dd7589F03B43658'
+export const BEAM_DAO_ADDRESS = '0x151DC9F0Bd4487d895a012040a951fA239ff5aBF'
 
 // Export for easy importing
 export const beamDAOContract = {

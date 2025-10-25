@@ -6,10 +6,9 @@ export interface Proposal {
   yesVotes: bigint
   noVotes: bigint
   totalVoted: bigint
-  quorum: bigint
   startTime: number
   endTime: number
-  executed: boolean
+  completed: boolean
   creator: string
 }
 
@@ -25,6 +24,23 @@ export interface Project {
   createdAt: number
   active: boolean
   governanceTokens: string[]
+}
+
+export interface ProposalResult {
+  yesVotes: bigint
+  noVotes: bigint
+  totalVoted: bigint
+  yesPercentage: number
+  noPercentage: number
+  isCompleted: boolean
+  timeRemaining: bigint
+}
+
+export interface Activity {
+  user: string
+  activityType: number // 0=ProjectCreated, 1=ProposalCreated, 2=Staked, 3=Voted, 4=ProposalCompleted
+  timestamp: bigint
+  amount: bigint
 }
 
 export type HasVotedResponse = boolean

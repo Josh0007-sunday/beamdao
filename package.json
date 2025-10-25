@@ -10,6 +10,8 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@pushchain/core": "^2.1.0",
+    "@pushchain/ui-kit": "^2.0.13",
     "@tailwindcss/vite": "^4.1.13",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",

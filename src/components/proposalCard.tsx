@@ -1,7 +1,11 @@
-import { useAccount, useWriteContract, useReadContract } from 'wagmi'
+import { useReadContract, useAccount } from 'wagmi'
+import { usePushWalletContext, usePushChainClient, PushUI } from '@pushchain/ui-kit'
+import { PushChain } from '@pushchain/core'
 import { beamDAOContract } from '../contracts/beamDaoContract'
 import type { Proposal } from '../types'
 import { formatUnits } from 'viem'
+import toast from 'react-hot-toast'
+import { useState } from 'react'
 
 interface ProposalCardProps {
   proposal: Proposal
@@ -10,38 +14,38 @@ interface ProposalCardProps {
 
 export function ProposalCardSkeleton() {
   return (
-    <div className="bg-white rounded-lg border border-gray-200 p-4 animate-pulse">
-      <div className="flex justify-between items-start mb-2">
-        <div>
-          <div className="h-4 bg-gray-200 rounded w-20 mb-2"></div>
+    <div className="bg-white rounded-lg border border-gray-200 p-3 animate-pulse">
+      <div className="flex justify-between items-center mb-2">
+        <div className="flex items-center space-x-2">
           <div className="h-3 bg-gray-200 rounded w-16"></div>
+          <div className="h-3 bg-gray-200 rounded w-1"></div>
+          <div className="h-3 bg-gray-200 rounded w-12"></div>
         </div>
-        <div className="h-6 w-20 bg-gray-200 rounded-full"></div>
+        <div className="h-5 w-16 bg-gray-200 rounded-full"></div>
       </div>
-      <div className="h-5 bg-gray-200 rounded w-3/4 mb-2"></div>
-      <div className="h-4 bg-gray-200 rounded w-full mb-2"></div>
-      <div className="h-4 bg-gray-200 rounded w-1/2"></div>
-      <div className="mt-4">
-        <div className="h-2 bg-gray-200 rounded-full w-full mb-2"></div>
-        <div className="flex justify-between text-xs text-gray-500 mt-1">
-          <div className="h-3 bg-gray-200 rounded w-24"></div>
-          <div className="h-3 bg-gray-200 rounded w-24"></div>
-        </div>
+      <div className="h-4 bg-gray-200 rounded w-3/4 mb-1"></div>
+      <div className="h-3 bg-gray-200 rounded w-full mb-1"></div>
+      <div className="h-3 bg-gray-200 rounded w-2/3 mb-3"></div>
+      <div className="h-1.5 bg-gray-200 rounded-full w-full mb-1.5"></div>
+      <div className="flex justify-between items-center mb-3">
+        <div className="h-3 bg-gray-200 rounded w-20"></div>
+        <div className="h-3 bg-gray-200 rounded w-16"></div>
       </div>
-      <div className="flex justify-between items-center mt-4">
-        <div className="h-4 bg-gray-200 rounded w-32"></div>
-      </div>
-      <div className="flex space-x-3 mt-4">
-        <div className="flex-1 h-8 bg-gray-200 rounded-lg"></div>
-        <div className="flex-1 h-8 bg-gray-200 rounded-lg"></div>
+      <div className="flex space-x-2">
+        <div className="flex-1 h-7 bg-gray-200 rounded-md"></div>
+        <div className="flex-1 h-7 bg-gray-200 rounded-md"></div>
       </div>
     </div>
   )
 }
 
 export default function ProposalCard({ proposal, userStake }: ProposalCardProps) {
+  const { connectionStatus } = usePushWalletContext()
+  const { pushChainClient } = usePushChainClient()
   const { address } = useAccount()
-  const { writeContract } = useWriteContract()
+  const [isVoting, setIsVoting] = useState(false)
+
+  const isConnected = connectionStatus === PushUI.CONSTANTS.CONNECTION.STATUS.CONNECTED
 
   const { data: hasVotedData } = useReadContract({
     ...beamDAOContract,
@@ -53,31 +57,50 @@ export default function ProposalCard({ proposal, userStake }: ProposalCardProps)
   })
   const hasVoted: boolean = typeof hasVotedData === 'boolean' ? hasVotedData : false;
 
-  const handleVote = (support: boolean) => {
-    if (!address) return
+  const handleVote = async (support: boolean) => {
+    if (!isConnected || !pushChainClient) {
+      toast.error('Please connect your wallet')
+      return
+    }
 
-    writeContract({
-      ...beamDAOContract,
-      functionName: 'vote',
-      args: [BigInt(proposal.id), support],
-    })
+    setIsVoting(true)
+
+    try {
+      const data = PushChain.utils.helpers.encodeTxData({
+        abi: JSON.parse(JSON.stringify(beamDAOContract.abi)),
+        functionName: 'vote',
+        args: [BigInt(proposal.id), support],
+      })
+
+      const txPromise = pushChainClient.universal.sendTransaction({
+        to: beamDAOContract.address as `0x${string}`,
+        value: BigInt('0'),
+        data: data,
+      })
+
+      toast.promise(txPromise, {
+        loading: 'Submitting vote...',
+        success: 'Vote submitted successfully!',
+        error: 'Failed to submit vote',
+      })
+
+      await txPromise
+    } catch (error) {
+      console.error('Error voting:', error)
+    } finally {
+      setIsVoting(false)
+    }
   }
 
-  const handleExecute = () => {
-    writeContract({
-      ...beamDAOContract,
-      functionName: 'executeProposal',
-      args: [BigInt(proposal.id)],
-    })
-  }
 
   const getStatus = () => {
     const now = Math.floor(Date.now() / 1000)
-    if (proposal.executed) return 'Executed'
+    if (proposal.completed || now > proposal.endTime) {
+      return 'Completed'
+    }
     if (now < proposal.startTime) return 'Pending'
     if (now <= proposal.endTime) return 'Active'
-    if (proposal.totalVoted >= proposal.quorum) return 'Completed'
-    return 'Defeated'
+    return 'Completed'
   }
 
   const status = getStatus()
@@ -88,12 +111,8 @@ export default function ProposalCard({ proposal, userStake }: ProposalCardProps)
         return 'bg-yellow-100 text-yellow-800'
       case 'Active':
         return 'bg-green-100 text-green-800'
-      case 'Executed':
-        return 'bg-blue-100 text-blue-800'
       case 'Completed':
         return 'bg-purple-100 text-purple-800'
-      case 'Defeated':
-        return 'bg-red-100 text-red-800'
       default:
         return 'bg-gray-100 text-gray-800'
     }
@@ -102,10 +121,13 @@ export default function ProposalCard({ proposal, userStake }: ProposalCardProps)
   const yesVotes = proposal.yesVotes
   const noVotes = proposal.noVotes
   const totalVoted = proposal.totalVoted
-  const quorum = proposal.quorum
 
-  const votePercentage = totalVoted > 0n 
+  const yesPercentage = totalVoted > 0n
     ? Number(yesVotes * 100n / totalVoted)
+    : 0
+
+  const noPercentage = totalVoted > 0n
+    ? Number(noVotes * 100n / totalVoted)
     : 0
 
   // Fix date issues
@@ -117,84 +139,89 @@ export default function ProposalCard({ proposal, userStake }: ProposalCardProps)
   const deadline = endTime > 0 ? new Date(endTime * 1000).toLocaleDateString() : 'Invalid Date'
 
   return (
-    <div className="bg-white rounded-lg border border-gray-200 p-4">
-      <div className="flex justify-between items-start mb-2">
-        <div>
-          <span className="text-sm font-medium text-gray-500">{proposalId}</span>
-          <p className="text-xs text-gray-400">{date}</p>
+    <div className="bg-white rounded-lg border border-gray-200 p-3 hover:shadow-md transition-shadow">
+      {/* Header with ID and Status */}
+      <div className="flex justify-between items-center mb-2">
+        <div className="flex items-center space-x-2">
+          <span className="text-xs font-semibold text-gray-700">{proposalId}</span>
+          <span className="text-xs text-gray-400">•</span>
+          <span className="text-xs text-gray-500">{date}</span>
         </div>
-        <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(status)}`}>
+        <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${getStatusColor(status)}`}>
           {status}
         </span>
       </div>
-      
-      <h3 className="text-lg font-semibold text-gray-900 mb-2">{proposal.title}</h3>
-      <p className="text-gray-600 text-sm mb-2 line-clamp-2">{proposal.description}</p>
-      
-      {/* Voting Progress */}
-      <div className="mb-2">
-        <div className="flex justify-between text-sm text-gray-600 mb-1">
-          <span>For: {formatUnits(yesVotes, 18)}</span>
-          <span>Against: {formatUnits(noVotes, 18)}</span>
-        </div>
-        <div className="w-full bg-gray-200 rounded-full h-2">
-          <div 
-            className="bg-green-500 h-2 rounded-full transition-all duration-300" 
-            style={{ width: `${votePercentage}%` }}
+
+      {/* Title and Description */}
+      <h3 className="text-base font-semibold text-gray-900 mb-1 line-clamp-1">{proposal.title}</h3>
+      <p className="text-gray-600 text-xs mb-3 line-clamp-2">{proposal.description}</p>
+
+      {/* Voting Progress Bar */}
+      <div className="mb-3">
+        <div className="w-full bg-gray-200 rounded-full h-1.5 flex overflow-hidden">
+          <div
+            className="bg-green-500 h-1.5 transition-all duration-300"
+            style={{ width: `${yesPercentage}%` }}
+          ></div>
+          <div
+            className="bg-red-500 h-1.5 transition-all duration-300"
+            style={{ width: `${noPercentage}%` }}
           ></div>
         </div>
-        <div className="flex justify-between text-xs text-gray-500 mt-1">
-          <span>Total Votes: {formatUnits(totalVoted, 18)}</span>
-          <span>Quorum: {formatUnits(quorum, 18)}</span>
+        <div className="flex justify-between items-center mt-1.5">
+          <div className="flex items-center space-x-3 text-xs">
+            <span className="text-green-600 font-medium">{yesPercentage}% Yes</span>
+            <span className="text-red-600 font-medium">{noPercentage}% No</span>
+          </div>
+          <span className="text-xs text-gray-500">Ends: {deadline}</span>
         </div>
       </div>
-      
-      <div className="flex justify-between items-center mb-2">
-        <div className="text-sm text-gray-500">
-          Deadline: <span className="font-medium">{deadline}</span>
-        </div>
-      </div>
-  
+
+      {/* Voting Buttons */}
       {status === 'Active' && address && !hasVoted && userStake !== undefined && userStake > 0n && (
-        <div className="flex space-x-3">
+        <div className="flex space-x-2">
           <button
             onClick={() => handleVote(true)}
-            className="flex-1 bg-green-500 hover:bg-green-600 text-white py-1 px-2 rounded-lg text-sm font-medium transition-colors"
+            disabled={isVoting}
+            className="flex-1 bg-green-500 hover:bg-green-600 text-white py-1.5 px-3 rounded-md text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            Vote For
+            {isVoting ? 'Voting...' : 'Vote For'}
           </button>
           <button
             onClick={() => handleVote(false)}
-            className="flex-1 bg-red-500 hover:bg-red-600 text-white py-1 px-2 rounded-lg text-sm font-medium transition-colors"
+            disabled={isVoting}
+            className="flex-1 bg-red-500 hover:bg-red-600 text-white py-1.5 px-3 rounded-md text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            Vote Against
+            {isVoting ? 'Voting...' : 'Vote Against'}
           </button>
         </div>
       )}
 
       {status === 'Active' && address && !hasVoted && userStake !== undefined && userStake === 0n && (
-        <div className="text-center text-sm text-gray-500 py-1">
-          Stake to be able to vote
+        <div className="text-center text-xs text-gray-500 py-1.5 bg-gray-50 rounded-md">
+          Stake tokens to vote
         </div>
       )}
 
       {status === 'Active' && hasVoted && (
-        <div className="text-center text-sm text-green-600 py-1">
-          You have already voted on this proposal
+        <div className="text-center text-xs text-green-600 py-1.5 bg-green-50 rounded-md font-medium">
+          ✓ You voted on this proposal
         </div>
       )}
 
       {status === 'Completed' && (
-        <button
-          onClick={handleExecute}
-          className="w-full bg-blue-500 hover:bg-blue-600 text-white py-1 px-2 rounded-lg text-sm font-medium transition-colors"
-        >
-          Execute Proposal
-        </button>
+        <div className="text-center py-1.5 bg-purple-50 rounded-md">
+          <p className="text-xs font-medium text-purple-700">
+            Voting Completed
+          </p>
+          <p className="text-xs text-gray-600 mt-0.5">
+            {formatUnits(yesVotes, 18)} YES ({yesPercentage}%) • {formatUnits(noVotes, 18)} NO ({noPercentage}%)
+          </p>
+        </div>
       )}
 
       {!address && status === 'Active' && (
-        <div className="text-center text-sm text-gray-500 py-1">
+        <div className="text-center text-xs text-gray-500 py-1.5 bg-gray-50 rounded-md">
           Connect wallet to vote
         </div>
       )}

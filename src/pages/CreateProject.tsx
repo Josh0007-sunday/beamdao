@@ -1,7 +1,9 @@
 import { useState } from 'react'
-import { useAccount, useWriteContract } from 'wagmi'
+import { usePushWalletContext, usePushChainClient, PushUI } from '@pushchain/ui-kit'
+import { PushChain } from '@pushchain/core'
 import { beamDAOContract } from '../contracts/beamDaoContract'
 import Header from '../components/header'
+import toast from 'react-hot-toast'
 
 interface ProjectPreviewCardProps {
   name: string;
@@ -34,40 +36,64 @@ function ProjectPreviewCard({ name, logoURI, backdropURI, bio, creator }: Projec
 }
 
 export default function CreateProject() {
-  const { address } = useAccount()
-  const { writeContract } = useWriteContract()
-  
+  const { connectionStatus } = usePushWalletContext()
+  const { pushChainClient } = usePushChainClient()
+
   const [name, setName] = useState('')
   const [logoURI, setLogoURI] = useState('')
   const [backdropURI, setBackdropURI] = useState('')
   const [bio, setBio] = useState('')
   const [governanceTokens, setGovernanceTokens] = useState('')
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const isConnected = connectionStatus === PushUI.CONSTANTS.CONNECTION.STATUS.CONNECTED
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    
-    if (!address) return
+
+    if (!isConnected || !pushChainClient) {
+      toast.error('Please connect your wallet')
+      return
+    }
 
     const tokens = governanceTokens.split(',').map(token => token.trim())
 
-    writeContract({
-      ...beamDAOContract,
-      functionName: 'createProject',
-      args: [
-        name,
-        logoURI,
-        backdropURI,
-        bio,
-        tokens
-      ],
-    })
+    setIsSubmitting(true)
 
-    // Reset form
-    setName('')
-    setLogoURI('')
-    setBackdropURI('')
-    setBio('')
-    setGovernanceTokens('')
+    try {
+      // Encode the contract function call
+      const data = PushChain.utils.helpers.encodeTxData({
+        abi: JSON.parse(JSON.stringify(beamDAOContract.abi)),
+        functionName: 'createProject',
+        args: [name, logoURI, backdropURI, bio, tokens],
+      })
+
+      // Send transaction via Push Chain Client
+      const txPromise = pushChainClient.universal.sendTransaction({
+        to: beamDAOContract.address as `0x${string}`,
+        value: BigInt('0'),
+        data: data,
+      })
+
+      toast.promise(txPromise, {
+        loading: 'Creating project...',
+        success: 'Project created successfully!',
+        error: 'Failed to create project',
+      })
+
+      await txPromise
+
+      // Reset form
+      setName('')
+      setLogoURI('')
+      setBackdropURI('')
+      setBio('')
+      setGovernanceTokens('')
+    } catch (error) {
+      console.error('Error creating project:', error)
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   return (
@@ -143,16 +169,17 @@ export default function CreateProject() {
             <div className="pt-4">
               <button
                 type="submit"
-                className="w-full text-white py-2 px-4 rounded-lg font-medium transition-colors"
+                disabled={isSubmitting || !isConnected}
+                className="w-full text-white py-2 px-4 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 style={{ backgroundColor: '#d947f2' }}
               >
-                Create Project
+                {isSubmitting ? 'Creating...' : 'Create Project'}
               </button>
             </div>
           </form>
           <div>
             <h2 className="text-xl font-bold text-gray-900 mb-4">Project Preview</h2>
-            <ProjectPreviewCard name={name} logoURI={logoURI} backdropURI={backdropURI} bio={bio} creator={address} />
+            <ProjectPreviewCard name={name} logoURI={logoURI} backdropURI={backdropURI} bio={bio} creator={isConnected ? 'Connected' : undefined} />
           </div>
         </div>
       </main>
